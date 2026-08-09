@@ -1,0 +1,6 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "description": "Run one goal across many fresh Claude Code sessions with automatic context-fill-triggered handoff, drift control, and verified completion.",
+  "author": { "name": "relay contributors" }
+}
