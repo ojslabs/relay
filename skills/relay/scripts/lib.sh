@@ -93,9 +93,11 @@ context_fill_pct() {
   echo $(( tokens * 100 / window ))
 }
 
-# File mtime as epoch seconds, BSD and GNU stat both handled.
+# File mtime as epoch seconds, GNU and BSD stat both handled. GNU must be
+# tried first: on GNU, `stat -f %m` succeeds but prints the filesystem mount
+# point, which would silently poison the comparison.
 mtime_epoch() {
-  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0
 }
 
 # Emit a hook JSON response that feeds `reason` back to Claude.
