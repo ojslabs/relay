@@ -160,13 +160,15 @@ run_loop() {
     write_state running "$leg" "$THRESHOLD" "$WINDOW" "$MAX_LEGS" "$VERIFY" "$(now_epoch)"
     echo "relay: leg $leg starting ($(now_iso))"
 
-    local args=(-p --output-format json)
+    # The prompt goes directly after -p: variadic flags like --allowedTools
+    # would otherwise swallow a trailing positional prompt as extra values.
+    local args=(-p "$(leg_prompt "$leg")" --output-format json)
     [ -n "$MODEL" ] && args+=(--model "$MODEL")
     [ -n "$BUDGET" ] && args+=(--max-budget-usd "$BUDGET")
     [ ${#EXTRA_ARGS[@]} -gt 0 ] && args+=("${EXTRA_ARGS[@]}")
 
     local out session_id
-    out=$(RELAY_RUNNER=1 RELAY_CONTEXT_WINDOW="$WINDOW" "$CLAUDE_CMD" "${args[@]}" "$(leg_prompt "$leg")" 2>>"$RELAY_DIR/runner-errors.log")
+    out=$(RELAY_RUNNER=1 RELAY_CONTEXT_WINDOW="$WINDOW" "$CLAUDE_CMD" "${args[@]}" 2>>"$RELAY_DIR/runner-errors.log")
     local exit_code=$?
     session_id=$(printf '%s' "$out" | { jq -r '.session_id // empty' 2>/dev/null || python3 -c 'import json,sys
 try: print(json.load(sys.stdin).get("session_id",""))

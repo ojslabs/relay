@@ -77,6 +77,14 @@ bash "$SCRIPTS/relay.sh" start "toy mission" --max-legs 2 --verify "test -f neve
 check "stops at the cap" grep -q '"status": *"stopped"' .relay/state.json
 check "ran exactly max legs" [ "$(grep -c '"leg"' .relay/log.jsonl)" = "2" ]
 
+echo "7. leg prompt survives variadic passthrough flags"
+fresh_dir
+export FAKE_PLAN="done"
+bash "$SCRIPTS/relay.sh" start "toy mission" \
+  --claude-arg --allowedTools --claude-arg "Bash Edit Write" >/dev/null 2>&1
+check "legs still receive the leg prompt" grep -q "relay" .relay/last-args
+check "the allowlist reached the CLI too" grep -q "Bash Edit Write" .relay/last-args
+
 echo ""
 echo "passed $PASS, failed $FAIL"
 [ "$FAIL" = "0" ]
