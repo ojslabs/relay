@@ -28,7 +28,7 @@ $armed = "$RelayDir/handoff-armed"
 $lastFired = if (Test-Path $armed) { [int](Get-Content $armed) } else { 0 }
 if ($lastFired -eq 0) {
   Set-Content $armed $fill
-  @{ decision = "block"; reason = "Relay: context is at $fill% of the window (threshold $threshold%). Hand off now: stop starting new work, bring .relay/baton.md fully up to date (every section, including the failed-approaches ledger and the drift check), then end the leg. If the mission is already complete with evidence, write .relay/DONE.md instead." } | ConvertTo-Json -Compress
+  @{ decision = "block"; reason = "Relay: context is at $fill% of the window (threshold $threshold%). Hand off now: stop starting new work, bring .relay/baton.md fully up to date (every section, including the failed-approaches ledger and the drift check), then end the leg. If this leg has not completed any unit of work yet and one small unit clearly fits, finish exactly that one unit first. If the mission is already complete with evidence, write .relay/DONE.md instead." } | ConvertTo-Json -Compress
 } elseif ($fill -ge ($lastFired + 10)) {
   Set-Content $armed $fill
   @{ decision = "block"; reason = "Relay: context is now at $fill%. Finish the handoff immediately: update .relay/baton.md and end the leg." } | ConvertTo-Json -Compress

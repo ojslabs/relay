@@ -26,7 +26,7 @@ last_fired=0
 
 if [ "$last_fired" -eq 0 ] 2>/dev/null; then
   echo "$fill" > "$armed_file"
-  hook_block "Relay: context is at ${fill}% of the window (threshold ${threshold}%). Hand off now: stop starting new work, bring .relay/baton.md fully up to date (every section, including the failed-approaches ledger and the drift check), then end the leg. If the mission is already complete with evidence, write .relay/DONE.md instead."
+  hook_block "Relay: context is at ${fill}% of the window (threshold ${threshold}%). Hand off now: stop starting new work, bring .relay/baton.md fully up to date (every section, including the failed-approaches ledger and the drift check), then end the leg. If this leg has not completed any unit of work yet and one small unit clearly fits, finish exactly that one unit first. If the mission is already complete with evidence, write .relay/DONE.md instead."
 elif [ "$fill" -ge $(( last_fired + 10 )) ] 2>/dev/null; then
   echo "$fill" > "$armed_file"
   hook_block "Relay: context is now at ${fill}%. Finish the handoff immediately: update .relay/baton.md and end the leg. Every further tool call degrades the handoff."

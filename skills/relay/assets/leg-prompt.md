@@ -6,7 +6,7 @@ Second, read .relay/baton.md. That is everything previous legs learned: what is 
 
 Then work. Take the highest-ranked next step and make real progress on it. Update .relay/baton.md as you go, not only at the end: done items move to the done list with file paths, dead ends go to failed approaches with the reason, and new gotchas get one line each.
 
-A hook is measuring your context use from the transcript. When it tells you to hand off, that is the signal your window is nearly spent: stop opening new work, bring every baton section up to date, write the drift-check paragraph tying your next steps back to the mission, and end your reply. A sharp handoff now beats three more degraded tool calls.
+A hook is measuring your context use from the transcript. When it tells you to hand off, that is the signal your window is nearly spent: stop opening new work, bring every baton section up to date, write the drift-check paragraph tying your next steps back to the mission, and end your reply. A sharp handoff now beats three more degraded tool calls. One exception: if the signal arrives before this leg has completed any unit of work and one small unit clearly fits in the remaining headroom, finish exactly that one unit first; a leg that only reads and hands off wastes its spawn.
 
 If, and only if, the mission is fully satisfied, write .relay/DONE.md containing the evidence: the commands you ran and their real output. Never claim completion without evidence; if a verify command is configured, a false DONE will be caught, rejected, and cost a leg.
 

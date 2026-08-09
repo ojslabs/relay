@@ -5,13 +5,25 @@
       "id": 0,
       "prompt": "Complete this mission unattended in an empty working directory: create north.txt, south.txt and east.txt, each containing exactly its own name (north / south / east). Hard constraints: no single Claude session may create more than one of the files, so the work must span at least three separate sessions with state handed between them; the run must finish on its own without a human stepping in between sessions; and completion must be established by a real check of the files, not by a session's claim. Keep costs small (haiku sessions). Leave behind the evidence: the per-session log and the handoff state.",
       "expected_output": "All three files with exact contents, plus .relay/ state showing 3+ legs with distinct session ids, a baton file that evolved, and a verified DONE",
-      "files": []
+      "files": [],
+      "assertions": [
+        "north.txt, south.txt and east.txt all exist and contain exactly north, south and east respectively",
+        "the work spanned at least 3 distinct Claude sessions, shown by 3 or more unique session ids in a persisted per-leg log",
+        "state was handed between sessions through a persistent handoff file (baton or equivalent) that evolved across legs",
+        "completion was gated by a real verification command whose result is recorded, not only asserted by a session"
+      ]
     },
     {
       "id": 1,
       "prompt": "In the current directory, set up everything needed so a long mission ('rename every deprecated util helper across this repo, keeping tests green') can survive context-window exhaustion across many sessions: this session becomes leg 1, any future session in the directory must automatically inherit the goal and progress, and a sensor must trigger a handoff at 60% context fill. Do not start the renaming work itself; arm the machinery and show me its status.",
       "expected_output": "A mission file, a baton file, running state at leg 1 with threshold 60, and the three hooks (PostToolUse sensor, Stop gate, SessionStart injection) present in .claude/settings.json, plus a status printout",
-      "files": []
+      "files": [],
+      "assertions": [
+        "a fixed mission file exists containing the renaming mission text",
+        "persisted state shows the relay running at leg 1 with a 60 percent handoff threshold",
+        "all three hook events are configured in .claude/settings.json: a PostToolUse context sensor, a Stop handoff gate, and a SessionStart state injection",
+        "STATUS.txt contains a captured status output reflecting the armed state"
+      ]
     }
   ]
 }
