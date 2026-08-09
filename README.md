@@ -72,6 +72,10 @@ macOS and Linux run everything. Native Windows runs the full relay through `rela
 
 Logic tests run without any API key on all three platforms: `bash tests/run.sh` or `pwsh tests/run.ps1`.
 
+## Benchmarks
+
+Measured, not vibes: [BENCHMARKS.md](BENCHMARKS.md) holds an A/B run on real SWE-bench Lite issues (baseline session vs relay, same model and budget, blind-judged Elo). Short version: on tasks that fit one context window relay is overhead and you should run one session; when a fix was forced across a mid-task handoff, the two-session run produced a byte-identical patch with the hidden tests green, which is the anti-drift property doing its job.
+
 ## Docs
 
 Design details live in [skills/relay/references/architecture.md](skills/relay/references/architecture.md): the exact token math, why handoff at 70% beats 95%, hook payload behavior, and the prior-art map.
