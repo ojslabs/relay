@@ -22,6 +22,14 @@ works, and hands off before its context window degrades. State lives on disk in
 
 All paths below are relative to this skill directory unless they start with `.relay/`.
 
+## When not to use this
+
+A task that plainly fits one context window does not need a relay; measured on
+single-window SWE issues, relay legs averaged 1.7x the tokens of a plain
+session for no resolution gain (see BENCHMARKS.md in the repo). Reach for
+relay when the mission will not fit: multi-hour builds, migrations, audits,
+chained issues, anything where the alternative is compaction mid-task.
+
 ## Which mode
 
 **Runner mode (default for "run this whole thing"):** an outer loop drives
@@ -72,6 +80,11 @@ rewritten by every leg and has fixed sections: mission digest, done so far
 retry these), learnings, and a drift check paragraph that ties the next steps
 back to the mission. The failed-approaches ledger is what makes a relay
 cheaper than one long session: dead ends are paid for once.
+
+The baton is written lazily. While the sensor is quiet, the mission gets every
+token and the baton gets at most one-line dead-end entries; the full rewrite
+happens once, when the handoff signal fires or the leg ends. Continuous baton
+grooming measurably bloats legs without improving handoffs.
 
 ## Completion
 
