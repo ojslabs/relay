@@ -85,6 +85,17 @@ bash "$SCRIPTS/relay.sh" start "toy mission" \
 check "legs still receive the leg prompt" grep -q "relay" .relay/last-args
 check "the allowlist reached the CLI too" grep -q "Bash Edit Write" .relay/last-args
 
+echo "8. context window is detected, never assumed"
+fresh_dir
+printf '{"type":"assistant","message":{"model":"claude-sonnet-5","usage":{"input_tokens":2,"cache_creation_input_tokens":16543,"cache_read_input_tokens":58087,"output_tokens":100}}}\n' > t.jsonl
+check "a 1M-window model is detected as 1M" [ "$(model_window t.jsonl)" = "1000000" ]
+check "fill is measured against the real window, not 200k" [ "$(context_fill_pct t.jsonl)" = "7" ]
+printf '{"type":"assistant","message":{"model":"claude-haiku-4-5-20251001","usage":{"input_tokens":2,"cache_read_input_tokens":58087,"output_tokens":100}}}\n' > h.jsonl
+check "a 200k-window model is detected as 200k" [ "$(model_window h.jsonl)" = "200000" ]
+mkdir -p .relay
+printf '{"status":"running","window":500000}\n' > .relay/state.json
+check "a recorded window in state.json wins over detection" [ "$(context_fill_pct t.jsonl)" = "14" ]
+
 echo ""
 echo "passed $PASS, failed $FAIL"
 [ "$FAIL" = "0" ]

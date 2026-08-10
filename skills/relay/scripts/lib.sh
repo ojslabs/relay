@@ -83,12 +83,33 @@ print(last)' 2>/dev/null || echo 0
   fi
 }
 
+# The context window of the model a session is actually running on. Getting
+# this wrong is the worst failure mode available to a relay: assume 200k on a
+# model with a 1M window and every handoff fires at a fifth of the real depth,
+# paying a full session restart to solve a problem the session did not have.
+# Usage: model_window <transcript.jsonl>
+model_window() {
+  local model
+  model=$(tail -n 200 "$1" 2>/dev/null | grep -o '"model":"[^"]*"' | tail -1 | cut -d'"' -f4)
+  case "$model" in
+    *opus-5*|*sonnet-5*|*fable-5*|*mythos-5*|*[-_]1m*) echo 1000000;;
+    *haiku*) echo 200000;;
+    "") echo "$RELAY_DEFAULT_WINDOW";;
+    *) echo 200000;;
+  esac
+}
+
 # Percentage of the context window in use, integer 0-100+.
+# Precedence: explicit override, then the window recorded in state.json (the
+# runner writes the true value there after leg 1), then model detection.
 # Usage: context_fill_pct <transcript.jsonl>
 context_fill_pct() {
   local tokens window
   tokens=$(context_tokens "$1")
-  window="${RELAY_CONTEXT_WINDOW:-$RELAY_DEFAULT_WINDOW}"
+  window="${RELAY_CONTEXT_WINDOW:-}"
+  [ -n "$window" ] || window=$(json_get "$RELAY_DIR/state.json" window)
+  [ -n "$window" ] && [ "$window" != "0" ] || window=$(model_window "$1")
+  [ -n "$window" ] && [ "$window" -gt 0 ] 2>/dev/null || window="$RELAY_DEFAULT_WINDOW"
   [ -n "$tokens" ] && [ "$tokens" -gt 0 ] 2>/dev/null || { echo 0; return; }
   echo $(( tokens * 100 / window ))
 }

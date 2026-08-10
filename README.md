@@ -74,7 +74,7 @@ Logic tests run without any API key on all three platforms: `bash tests/run.sh` 
 
 ## Benchmarks
 
-Measured, not vibes: [BENCHMARKS.md](BENCHMARKS.md) holds an A/B run on real SWE-bench Lite issues (baseline session vs relay, same model and budget, blind-judged Elo). Short version: on tasks that fit one context window relay is overhead and you should run one session; when a fix was forced across a mid-task handoff, the two-session run produced a byte-identical patch with the hidden tests green, which is the anti-drift property doing its job.
+Measured, and partly retracted: [BENCHMARKS.md](BENCHMARKS.md) holds A/B runs on real SWE-bench Lite issues, plus the audit that invalidated their headline. Read it before you trust any efficiency claim about this tool, including ours. Short version: on tasks that fit one context window relay is overhead and you should run one session; a handoff costs about 55k tokens and preserves the work (patches came out byte-identical across a session boundary); and the premise that a long session degrades is, in our own runs, still untested, because those runs never exceeded 16% of the model's context window.
 
 ## Docs
 

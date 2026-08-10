@@ -14,8 +14,6 @@ relay_active || exit 0
 
 threshold="$(json_get "$RELAY_DIR/state.json" threshold)"
 threshold="${threshold:-$RELAY_DEFAULT_THRESHOLD}"
-window_override="$(json_get "$RELAY_DIR/state.json" window)"
-[ -n "$window_override" ] && RELAY_CONTEXT_WINDOW="$window_override"
 
 fill=$(context_fill_pct "$HOOK_TRANSCRIPT")
 [ "$fill" -ge "$threshold" ] 2>/dev/null || exit 0

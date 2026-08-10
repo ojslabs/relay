@@ -95,7 +95,9 @@ MISSION=""
 VERIFY=""
 MAX_LEGS=20
 THRESHOLD=$RELAY_DEFAULT_THRESHOLD
-WINDOW=$RELAY_DEFAULT_WINDOW
+# 0 means auto: detect the model's real window from leg 1's result and record
+# it. --window overrides. Never assume; a wrong window mistimes every handoff.
+WINDOW=0
 MODEL=""
 BUDGET=""
 EXTRA_ARGS=()
@@ -167,9 +169,27 @@ run_loop() {
     [ -n "$BUDGET" ] && args+=(--max-budget-usd "$BUDGET")
     [ ${#EXTRA_ARGS[@]} -gt 0 ] && args+=("${EXTRA_ARGS[@]}")
 
-    local out session_id
-    out=$(RELAY_RUNNER=1 RELAY_CONTEXT_WINDOW="$WINDOW" "$CLAUDE_CMD" "${args[@]}" 2>>"$RELAY_DIR/runner-errors.log")
+    local out session_id win_env=""
+    [ "$WINDOW" -gt 0 ] 2>/dev/null && win_env="$WINDOW"
+    out=$(RELAY_RUNNER=1 RELAY_CONTEXT_WINDOW="$win_env" "$CLAUDE_CMD" "${args[@]}" 2>>"$RELAY_DIR/runner-errors.log")
     local exit_code=$?
+
+    # Learn the model's real context window from the leg's own result, so
+    # every later leg measures fill against the truth rather than a guess.
+    local detected
+    detected=$(printf '%s' "$out" | python3 -c '
+import json, sys
+try:
+    for u in (json.load(sys.stdin).get("modelUsage") or {}).values():
+        w = u.get("contextWindow")
+        if w: print(int(w)); break
+except Exception:
+    pass' 2>/dev/null)
+    if [ -n "$detected" ] && [ "$detected" -gt 0 ] 2>/dev/null && [ "$detected" != "$WINDOW" ]; then
+      [ "$WINDOW" -gt 0 ] 2>/dev/null && echo "relay: context window is ${detected} (was using ${WINDOW}); recalibrating"
+      WINDOW="$detected"
+      write_state running "$leg" "$THRESHOLD" "$WINDOW" "$MAX_LEGS" "$VERIFY" "$(now_epoch)"
+    fi
     session_id=$(printf '%s' "$out" | { jq -r '.session_id // empty' 2>/dev/null || python3 -c 'import json,sys
 try: print(json.load(sys.stdin).get("session_id",""))
 except Exception: print("")'; })
@@ -178,7 +198,9 @@ except Exception: print("")'; })
     transcript=""
     [ -n "$session_id" ] && transcript=$(ls "$HOME"/.claude/projects/*/"$session_id".jsonl 2>/dev/null | head -1)
     tokens=$(context_tokens "$transcript")
-    fill=$(( tokens * 100 / WINDOW ))
+    local win_for_pct="$WINDOW"
+    [ "$win_for_pct" -gt 0 ] 2>/dev/null || win_for_pct="$RELAY_DEFAULT_WINDOW"
+    fill=$(( tokens * 100 / win_for_pct ))
 
     local reason="handoff"
     [ $exit_code -ne 0 ] && reason="error($exit_code)"

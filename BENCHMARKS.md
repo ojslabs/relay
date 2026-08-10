@@ -1,9 +1,44 @@
 # relay A/B benchmarks
 
-Two rounds, run 2026-08-09 and 2026-08-10. Round 1 measured relay on
-single-window tasks (its cost floor). Round 2 iterated the skill on those
-findings, then ran marathon missions sized past the context window (its
-benefit case). Skip to the Round 2 marathon section for the headline result.
+Two rounds, run 2026-08-09 and 2026-08-10, followed by an audit that
+invalidated round 2's headline. Read the retraction first.
+
+## Retraction (2026-08-10)
+
+Round 2 originally claimed relay resolved 7 of 8 issues against a baseline's 6
+"because the baseline degraded deep in its context window." That claim does not
+survive its own data, and three errors caused it.
+
+**1. Neither arm ever approached context rot.** The runs used claude-sonnet-5,
+whose context window is 1,000,000 tokens (`modelUsage.contextWindow` in the run
+output). The baseline peaked at 158,391 tokens: **15.8% of its window**, with
+zero compactions, ending on `end_turn` because it finished. The reported "79%
+peak fill" came from relay's own hardcoded assumption of a 200,000-token window.
+The benchmark never entered the regime the skill exists for.
+
+**2. The one issue that decided the result was decided by an oracle, not by
+freshness.** Both arms' outcomes on psf/requests-3362 trace to what each found
+in the checkout's git history: the relay leg ran `git log --all` and surfaced
+the upstream commit, producing a patch byte-identical to the SWE-bench gold
+patch; the baseline ran only `git log --oneline -3`, was denied a WebSearch at
+the decision point, fell back to a modern release where the fix had since been
+reverted upstream, and followed that. Different information, not different
+context health.
+
+**3. The control was contaminated.** The claim "the same model solves requests
+easily standalone" is void: that run's working directory was
+`runs/psf__requests-3362__baseline/`, and the session ran `gh pr diff 3362`.
+The PR number appears nowhere in the issue text; it came from the path. The
+marathon runs carry no such leak (verified: zero such calls).
+
+**What the audit found instead of degradation:** effort *increased* with
+position. Per-issue tool calls in mission order ran 10, 13, 21, 8, 10, 8, 13,
+**38**; the last issue was the maximum on tool calls, test runs, verification
+depth, output tokens and wall time. A technique learned at issue 3 was reused
+at issues 6 and 8. No re-derivation of settled facts anywhere in the session.
+
+**Status of the claim:** untested, not disproven. What follows is the measured
+data, with only the conclusions the data actually supports.
 
 # Round 1: single-window issues, 2026-08-09
 
@@ -96,41 +131,70 @@ both arms failed requests-3362 here, an issue baseline solves in isolation.
 Eight issues across five codebases (two django, two flask, two pytest, one
 requests, one pylint), one mission.
 
-| arm | resolved | wall | sessions | output tokens | peak fill |
-|---|---|---|---|---|---|
-| baseline | 6/8 | 996s | 1 | 99.9k | 79% |
-| relay @70% | 7/8 | 790s | 2 | 106.7k | 60% |
+| arm | resolved | wall | sessions | turns | output tokens | peak fill (of 1M) |
+|---|---|---|---|---|---|---|
+| baseline | 6/8 | 996s | 1 | 228 | 99.9k | 15.8% |
+| relay @70% | 7/8 | 790s | 2 | 263 | 106.7k | 12.1% |
 
-**Relay resolved more, finished faster, at 7% extra tokens.** Blind judging of
-the differing patches (30 comparisons, 3 lenses x 2 orders, plus identity
-ties) scored quality even: Elo baseline 1006, relay 994, record 12-11-16.
+The 7-vs-6 difference is retracted as evidence for relay (see the retraction:
+it was an oracle asymmetry on one issue, at n=1). Blind judging of the
+differing patches, 30 comparisons across 3 lenses and both presentation
+orders, scored quality even: Elo baseline 1006, relay 994, record 12-11-16.
 
-The decisive issue is requests-3362. Baseline failed it in both marathons
-while solving it standalone, and its failure came late in a session running at
-up to 79% fill. Relay's fresh leg fixed it while never running a session past
-60%, with the patch the blind judges preferred 5 of 6 times for fixing the
-root cause in stream_decode_response_unicode; the hidden tests agreed. The one
-issue relay missed, flask-4045, has never been solved by any arm in any
-configuration in these benches.
+**What the run does support is a cost structure, and it is not the one the
+skill assumed.** Measured from the transcripts:
 
-Two things the run demonstrated beyond the score:
+| | baseline | relay |
+|---|---|---|
+| input tokens processed | 24.05M | 21.60M |
+| per turn | 105.5k | 82.1k |
+| per tool call | 193.9k | 154.3k |
+| context carried, Q1 to Q4 | 63k to 147k (x2.3) | 63k to 92k (x1.4) |
+| cache reads | 23.69M ($2.78) | 21.08M ($2.48) |
+| cache writes | 0.36M ($1.33) | 0.51M ($1.93) |
+| total | $5.62 | $6.01 |
 
-- **Degradation precedes compaction.** The baseline session never triggered
-  auto-compact; it simply got worse in the deep half of its window. Waiting
-  for compaction to defend context quality is too late, which is why relay's
-  sensor fires at a threshold rather than at the cliff.
+A relay leg carries 22% less context per turn, exactly as designed. It still
+costs 7% more in dollars, and the reason is prompt caching: re-reading an
+accumulated context bills at roughly $0.118 per million tokens, while a fresh
+session rebuilding its cache bills at $3.75 per million, about 32x. Caching
+already solves the *billing* half of context bloat. Only the *quality* half is
+left for a relay to win, and this benchmark never reached a depth where
+quality was in question.
+
+Two things the run does demonstrate, independent of the retraction:
+
 - **Ungraceful leg death is recoverable.** Relay's leg 1 was killed mid-flight
-  by its own per-leg budget cap (error exit, no clean handoff). Leg 2 started
-  from the on-disk mission, baton, and work products, recovered, and finished
-  7/8. The state on disk, not any single session, carries the mission.
+  by its own per-leg budget cap (error exit, no clean handoff, below its own
+  threshold). Leg 2 started from the on-disk mission, baton and work products,
+  recovered, and finished. The state on disk, not any single session, carries
+  the mission. This is a real property, and it is crash recovery rather than
+  rot avoidance.
+- **A handoff costs about 55k tokens.** Measured on leg 2: 55,115 prompt
+  tokens before its first productive tool call. Only 5,101 of that was reading
+  the handoff itself; 50,014 was session bootstrap (system prompt, tool
+  schemas, re-orientation) paid a second time. The baton compressed leg 1's
+  context about 33:1 and lost nothing needed to keep solving, only the
+  evidence, which cost 9 tool calls to regenerate.
 
-## The shape of the answer
+## What is actually established, and what is not
 
-Across both rounds one curve emerges: below one window, relay costs extra and
-buys nothing (run a single session); near the window, it breaks even; past
-the window, it wins on resolution and speed at near-parity token cost. The
-crossover sits where the mission stops fitting, which is the design intent,
-and what the skill's own docs now tell you.
+Established: relay flattens context growth per turn (x1.4 vs x2.3); a handoff
+costs roughly 55k tokens, mostly session bootstrap rather than the baton; a
+crashed leg is recoverable from disk; and under prompt caching a relay is not
+cheaper in dollars than one long session.
+
+Not established, by this benchmark or any other we have run: that a long
+session degrades, or that relay prevents it. The runs topped out at 15.8% of
+the window. The task shape (8 independent issues, each re-readable from disk)
+also removes almost every channel drift could travel through, and the three
+constraints that existed only in the prompt were never scored. n=1 per arm.
+
+Testing the actual claim needs a different experiment: a mission that fills
+the window, a task whose constraints live only in the conversation and are
+mechanically checkable at the end, oracle access equalized across arms
+(truncate checkout history at the base commit), identical budgets, and enough
+paired seeds to see past single-issue noise.
 
 ## Reproduce
 
