@@ -1,4 +1,11 @@
-# relay A/B benchmark, 2026-08-09
+# relay A/B benchmarks
+
+Two rounds, run 2026-08-09 and 2026-08-10. Round 1 measured relay on
+single-window tasks (its cost floor). Round 2 iterated the skill on those
+findings, then ran marathon missions sized past the context window (its
+benefit case). Skip to the Round 2 marathon section for the headline result.
+
+# Round 1: single-window issues, 2026-08-09
 
 Four real SWE-bench Lite issues, run head to head: a plain single Claude Code
 session versus the same session driven by relay. Same model (sonnet), same $4
@@ -63,6 +70,67 @@ The benefit case is missions that blow past one context window, where the
 alternative is compaction or a human re-prompting from scratch; the @30% runs
 show the mechanism survives that regime with correctness intact. A benchmark
 of genuinely window-exhausting missions is the natural next measurement.
+
+# Round 2: the marathon, 2026-08-10
+
+Round 1's findings went back into the skill first: the baton became lazy (full
+rewrite only at the handoff signal, one-line dead-end notes otherwise) and the
+leg protocol now states the mission outranks the relay bookkeeping. Then the
+regime the skill exists for: one continuous mission spanning many real issues,
+each in its own checkout with its own venv. Same scoring as round 1, applied
+only after the runs.
+
+## 4-issue marathon (~136k peak: still under the window)
+
+| arm | resolved | wall | sessions | output tokens | peak fill |
+|---|---|---|---|---|---|
+| baseline | 2/4 | 562s | 1 | 71.7k | 68% |
+| relay @70% | 2/4 | 688s | 2 | 103.5k | 56% |
+
+A tie on resolution, baseline cheaper. The mission strained the window without
+bursting it, so this row extends round 1's lesson. One scale signal though:
+both arms failed requests-3362 here, an issue baseline solves in isolation.
+
+## 8-issue marathon (the window actually runs out)
+
+Eight issues across five codebases (two django, two flask, two pytest, one
+requests, one pylint), one mission.
+
+| arm | resolved | wall | sessions | output tokens | peak fill |
+|---|---|---|---|---|---|
+| baseline | 6/8 | 996s | 1 | 99.9k | 79% |
+| relay @70% | 7/8 | 790s | 2 | 106.7k | 60% |
+
+**Relay resolved more, finished faster, at 7% extra tokens.** Blind judging of
+the differing patches (30 comparisons, 3 lenses x 2 orders, plus identity
+ties) scored quality even: Elo baseline 1006, relay 994, record 12-11-16.
+
+The decisive issue is requests-3362. Baseline failed it in both marathons
+while solving it standalone, and its failure came late in a session running at
+up to 79% fill. Relay's fresh leg fixed it while never running a session past
+60%, with the patch the blind judges preferred 5 of 6 times for fixing the
+root cause in stream_decode_response_unicode; the hidden tests agreed. The one
+issue relay missed, flask-4045, has never been solved by any arm in any
+configuration in these benches.
+
+Two things the run demonstrated beyond the score:
+
+- **Degradation precedes compaction.** The baseline session never triggered
+  auto-compact; it simply got worse in the deep half of its window. Waiting
+  for compaction to defend context quality is too late, which is why relay's
+  sensor fires at a threshold rather than at the cliff.
+- **Ungraceful leg death is recoverable.** Relay's leg 1 was killed mid-flight
+  by its own per-leg budget cap (error exit, no clean handoff). Leg 2 started
+  from the on-disk mission, baton, and work products, recovered, and finished
+  7/8. The state on disk, not any single session, carries the mission.
+
+## The shape of the answer
+
+Across both rounds one curve emerges: below one window, relay costs extra and
+buys nothing (run a single session); near the window, it breaks even; past
+the window, it wins on resolution and speed at near-parity token cost. The
+crossover sits where the mission stops fitting, which is the design intent,
+and what the skill's own docs now tell you.
 
 ## Reproduce
 
